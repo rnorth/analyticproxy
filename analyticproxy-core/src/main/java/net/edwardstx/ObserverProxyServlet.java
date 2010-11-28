@@ -19,10 +19,13 @@ package net.edwardstx;
  */
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -34,6 +37,8 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.analyticproxy.observer.ResponseObserver;
+import org.analyticproxy.validation.ValidationResponseObserver;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileUploadException;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
@@ -49,6 +54,8 @@ import org.apache.commons.httpclient.methods.multipart.FilePart;
 import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
 import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.StringPart;
+
+import com.google.common.collect.Maps;
 
 public class ObserverProxyServlet extends HttpServlet {
 	/**
@@ -82,6 +89,8 @@ public class ObserverProxyServlet extends HttpServlet {
 	 * The maximum size for uploaded files in bytes. Default value is 5MB.
 	 */
 	private int intMaxFileUploadSize = 5 * 1024 * 1024;
+	
+	private List<ResponseObserver> responseObservers = new ArrayList<ResponseObserver>();
 
 	/**
 	 * Initialize the <code>ObserverProxyServlet</code>
@@ -97,6 +106,8 @@ public class ObserverProxyServlet extends HttpServlet {
 				&& stringMaxFileUploadSize.length() > 0) {
 			this.setMaxFileUploadSize(Integer.parseInt(stringMaxFileUploadSize));
 		}
+		
+		this.responseObservers.add(new ValidationResponseObserver());
 	}
 
 	/**
@@ -285,7 +296,7 @@ public class ObserverProxyServlet extends HttpServlet {
 		HttpClient httpClient = new HttpClient();
 		httpMethodProxyRequest.setFollowRedirects(false);
 		// Execute the request
-		int intProxyResponseCode = httpClient
+		Integer intProxyResponseCode = httpClient
 				.executeMethod(httpMethodProxyRequest);
 
 		// Check if the proxy response is a redirect
@@ -337,15 +348,38 @@ public class ObserverProxyServlet extends HttpServlet {
 		}
 
 		// Send the content to the client
-		InputStream inputStreamProxyResponse = httpMethodProxyRequest
-				.getResponseBodyAsStream();
+		byte[] responseBody = httpMethodProxyRequest
+				.getResponseBody();
 		BufferedInputStream bufferedInputStream = new BufferedInputStream(
-				inputStreamProxyResponse);
+				new ByteArrayInputStream(responseBody));
 		OutputStream outputStreamClientResponse = httpServletResponse
 				.getOutputStream();
 		int intNextByte;
 		while ((intNextByte = bufferedInputStream.read()) != -1) {
 			outputStreamClientResponse.write(intNextByte);
+		}
+		
+		for (ResponseObserver ro : responseObservers) {
+			
+			Map<String,String> requestHeaders = Maps.newHashMap();
+			final Enumeration requestHeaderNames = httpServletRequest.getHeaderNames();
+			while (requestHeaderNames.hasMoreElements()) {
+				String headerName = (String) requestHeaderNames.nextElement();
+				String headerValue = httpServletRequest.getHeader(headerName);
+				requestHeaders.put(headerName, headerValue);
+			}
+			
+			Map<String,String> responseHeaders = Maps.newHashMap();
+			for (Header header : headerArrayResponse) {
+				responseHeaders.put(header.getName(), header.getValue());
+			}
+			
+			try {
+				ro.notify(new URI(httpMethodProxyRequest.getURI().toString()), intProxyResponseCode, requestHeaders, responseHeaders, new String(responseBody));
+			} catch (URISyntaxException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 	}
 
