@@ -5,9 +5,18 @@
 	<artifactId>analyticproxy</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
-	
+
 	<modules>
 		<module>analyticproxy-core</module>
 	</modules>
-		
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.mortbay.jetty</groupId>
+				<artifactId>maven-jetty-plugin</artifactId>
+				<version>6.1.10</version>
+			</plugin>
+		</plugins>
+	</build>
 </project>
