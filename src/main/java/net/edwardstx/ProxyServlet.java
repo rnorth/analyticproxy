@@ -94,7 +94,7 @@ public class ProxyServlet extends HttpServlet {
 	public void doGet (HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse)
     		throws IOException, ServletException {
 		// Create a GET request
-		GetMethod getMethodProxyRequest = new GetMethod(httpServletRequest.getRequestURL().toString());
+		GetMethod getMethodProxyRequest = new GetMethod(this.getProxyURL(httpServletRequest));
 		// Forward the request headers
 		setProxyRequestHeaders(httpServletRequest, getMethodProxyRequest);
     	// Execute the proxy request
@@ -348,7 +348,12 @@ public class ProxyServlet extends HttpServlet {
 //		}
 //		return stringProxyURL;
     	
-    	return httpServletRequest.getRequestURI().toString();
+    	String queryString = "";
+    	if (httpServletRequest.getQueryString() != null) {
+    		queryString = "?" + httpServletRequest.getQueryString();
+    	}
+    	
+    	return httpServletRequest.getRequestURL().toString() + queryString;
     }
 
 	private int getMaxFileUploadSize() {
