@@ -5,7 +5,7 @@
 
 	<servlet>
 		<servlet-name>ProxyServlet</servlet-name>
-		<servlet-class>net.edwardstx.ProxyServlet</servlet-class>
+		<servlet-class>net.edwardstx.ObserverProxyServlet</servlet-class>
 		<init-param>
 			<param-name>maxFileUploadSize</param-name>
 			<param-value></param-value>
