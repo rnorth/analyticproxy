@@ -420,15 +420,13 @@ public class ObserverProxyServlet extends HttpServlet {
 			while (enumerationOfHeaderValues.hasMoreElements()) {
 				String stringHeaderValue = (String) enumerationOfHeaderValues
 						.nextElement();
-				// In case the proxy host is running multiple virtual servers,
-				// rewrite the Host header to ensure that we get content from
-				// the correct virtual server
-				if (stringHeaderName.equalsIgnoreCase(STRING_HOST_HEADER_NAME)) {
-					// stringHeaderValue = getProxyHostAndPort();
+
+				if (stringHeaderName != "Accept-Encoding") {
+					Header header = new Header(stringHeaderName, stringHeaderValue);
+					// Set the same header on the proxy request
+					httpMethodProxyRequest.setRequestHeader(header);
 				}
-				Header header = new Header(stringHeaderName, stringHeaderValue);
-				// Set the same header on the proxy request
-				httpMethodProxyRequest.setRequestHeader(header);
+				
 			}
 		}
 	}

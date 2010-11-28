@@ -29,8 +29,8 @@ public class ParseContentTest {
 		Node child = document.getFirstChild();
 		print(child, "> ");
 
-		assertEquals("HTML", document.getFirstChild().getNodeName());
-		assertEquals("H1", document.getFirstChild().getChildNodes().item(1)
+		assertEquals("html", document.getFirstChild().getNodeName());
+		assertEquals("h1", document.getFirstChild().getChildNodes().item(1)
 				.getFirstChild().getNodeName());
 	}
 
@@ -42,8 +42,10 @@ public class ParseContentTest {
 		Document document = contentParser
 				.parseHtml("<html><body><h1>Hello world</h1></body></html>");
 
-		String resultDocument = xslTransformer.transform(document);
-		System.out.println(resultDocument);
+		String resultXML = xslTransformer.transform(document);
+		System.out.println(resultXML);
+		
+		assertEquals("<?xml version=\"1.0\" encoding=\"UTF-8\"?><heading xmlns=\"http://www.w3.org/1999/xhtml\">Hello world</heading>", resultXML.trim());
 	}
 
 	public void print(Node node, String indent) {

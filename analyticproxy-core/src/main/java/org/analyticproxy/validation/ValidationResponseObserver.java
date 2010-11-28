@@ -36,9 +36,10 @@ public class ValidationResponseObserver implements ResponseObserver {
 
 	private void validateContent(String responseBody) {
 		try {
-			//logger.info("Transforming document: " + responseBody);
+			logger.info("Transforming document: " + responseBody);
 			
 			Document document = new ContentParser().parseHtml(responseBody);
+			logger.info(document.getTextContent());
 			String transformedDocument = new XslTransformer("src/main/resources/wcag.xsl").transform(document);
 			
 			logger.info(transformedDocument);
