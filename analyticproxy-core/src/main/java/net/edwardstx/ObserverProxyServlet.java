@@ -350,7 +350,7 @@ public class ObserverProxyServlet extends HttpServlet {
 	}
 
 	public String getServletInfo() {
-		return "Jason's Proxy Servlet";
+		return "Observer Proxy Servlet";
 	}
 
 	/**
