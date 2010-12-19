@@ -83,8 +83,8 @@ public class ValidatorTask implements Runnable {
 		}
 
 		// Check whether existing content for this page has been stored
-		URI rawContentStorePath = new File("./target/content/raw").toURI();
-		URI validatedContentStorePath = new File("./target/content/validated").toURI();
+		URI rawContentStorePath = new File(ConfigurationProvider.getSetting("rawContentStore")).toURI();
+		URI validatedContentStorePath = new File(ConfigurationProvider.getSetting("validatedResultsContentStore")).toURI();
 
 		new File(rawContentStorePath).mkdirs();
 		new File(validatedContentStorePath).mkdirs();
@@ -105,7 +105,7 @@ public class ValidatorTask implements Runnable {
 			logger.error("Problem saving raw content - aborting", e);
 			return;
 		}
-		logger.info("Stored witnessed content");
+		logger.debug("Stored witnessed content");
 
 		// Submit content to validator
 		String validationResultsPage;
@@ -118,7 +118,7 @@ public class ValidatorTask implements Runnable {
 			logger.error("Problem performing validation - aborting", e);
 			return;
 		}
-		logger.info("Validation results obtained");
+		logger.debug("Validation results obtained");
 
 		// Save validation results
 		try {
@@ -129,7 +129,7 @@ public class ValidatorTask implements Runnable {
 			logger.error("Problem saving validated content - aborting", e);
 			return;
 		}
-		logger.info("Validation results saved");
+		logger.debug("Validation results saved");
 
 	}
 
@@ -171,7 +171,7 @@ public class ValidatorTask implements Runnable {
 
 		HttpResponse httpResponse = client.execute(post);
 
-		logger.info("HTTP response code was {}", httpResponse.getStatusLine());
+		logger.debug("HTTP response code was {}", httpResponse.getStatusLine());
 		if (httpResponse.getStatusLine().getStatusCode() != 200) {
 			throw new IOException("Unexpected status code received!");
 		}
@@ -187,7 +187,7 @@ public class ValidatorTask implements Runnable {
 		File rawContentFile = new File(thisUriContentStorePath);
 		rawContentFile.getParentFile().mkdirs();
 
-		logger.info("Saving content at {}", thisUriContentStorePath);
+		logger.debug("Saving content at {}", thisUriContentStorePath);
 
 		final FileWriter fileWriter = new FileWriter(rawContentFile);
 		try {
