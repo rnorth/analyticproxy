@@ -1,59 +1,42 @@
+/**
+ * 
+ */
 package org.analyticproxy.validation;
 
-import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamSource;
-
-import org.analyticproxy.observer.ResponseObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.Document;
-import org.w3c.dom.Node;
-import org.xml.sax.SAXException;
 
+/**
+ * @author richardnorth
+ *
+ */
 public class ValidationResponseObserver implements ResponseObserver {
 
-	private static final String CONTENT_TYPE = "Content-Type";
+	private static ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 5, 5, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
 	private static final Logger logger = LoggerFactory.getLogger(ValidationResponseObserver.class);
 	
+	
+	/* (non-Javadoc)
+	 * @see org.analyticproxy.observer.ResponseObserver#notify(java.net.URI, java.lang.Integer, java.util.Map, java.util.Map, java.lang.String)
+	 */
 	public void notify(URI uri, Integer responseCode,
 			Map<String, String> requestHeaders,
 			Map<String, String> responseHeaders, String responseBody) {
-		// TODO Auto-generated method stub
 		
-		final String contentType = responseHeaders.get(CONTENT_TYPE);
+		ValidatorTask validatorTask = new ValidatorTask(uri, responseCode, requestHeaders, responseHeaders, responseBody);
+		executor.execute(validatorTask);
 		
-		if (contentType.startsWith("text/html") && responseBody != null) {
-			logger.info(uri.toString());
-			logger.info(CONTENT_TYPE + ": " + contentType);
-			validateContent(responseBody);
-		}
+		logger.info("New task enqueued for URI {}", uri);
+		logger.info("Executor size: " + executor.getActiveCount());
 	}
 
-	private void validateContent(String responseBody) {
-		try {
-			logger.info("Transforming document: " + responseBody);
-			
-			Document document = new ContentParser().parseHtml(responseBody);
-			logger.info(document.getTextContent());
-			String transformedDocument = new XslTransformer("src/main/resources/wcag.xsl").transform(document);
-			
-			logger.info(transformedDocument);
-			
-		} catch (SAXException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (TransformerConfigurationException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+	public boolean isExecutionQuiet() {
+		return executor.getActiveCount() == 0;
 	}
-
 }

@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.GZIPInputStream;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -37,7 +38,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.analyticproxy.observer.ResponseObserver;
+import org.analyticproxy.validation.ResponseObserver;
 import org.analyticproxy.validation.ValidationResponseObserver;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileUploadException;
@@ -54,10 +55,16 @@ import org.apache.commons.httpclient.methods.multipart.FilePart;
 import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
 import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.StringPart;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Maps;
+import com.google.common.io.ByteStreams;
 
 public class ObserverProxyServlet extends HttpServlet {
+
+	private static final Logger logger = LoggerFactory.getLogger(ObserverProxyServlet.class);
+
 	/**
 	 * Serialization UID.
 	 */
@@ -82,14 +89,13 @@ public class ObserverProxyServlet extends HttpServlet {
 	/**
 	 * The directory to use to temporarily store uploaded files
 	 */
-	private static final File FILE_UPLOAD_TEMP_DIRECTORY = new File(
-			System.getProperty("java.io.tmpdir"));
+	private static final File FILE_UPLOAD_TEMP_DIRECTORY = new File(System.getProperty("java.io.tmpdir"));
 
 	/**
 	 * The maximum size for uploaded files in bytes. Default value is 5MB.
 	 */
 	private int intMaxFileUploadSize = 5 * 1024 * 1024;
-	
+
 	private List<ResponseObserver> responseObservers = new ArrayList<ResponseObserver>();
 
 	/**
@@ -100,14 +106,14 @@ public class ObserverProxyServlet extends HttpServlet {
 	 */
 	public void init(ServletConfig servletConfig) {
 		// Get the maximum file upload size if specified
-		String stringMaxFileUploadSize = servletConfig
-				.getInitParameter("maxFileUploadSize");
-		if (stringMaxFileUploadSize != null
-				&& stringMaxFileUploadSize.length() > 0) {
+		String stringMaxFileUploadSize = servletConfig.getInitParameter("maxFileUploadSize");
+		if (stringMaxFileUploadSize != null && stringMaxFileUploadSize.length() > 0) {
 			this.setMaxFileUploadSize(Integer.parseInt(stringMaxFileUploadSize));
 		}
-		
+
 		this.responseObservers.add(new ValidationResponseObserver());
+
+		System.out.println("Initialized ObserverProxyServlet");
 	}
 
 	/**
@@ -120,17 +126,13 @@ public class ObserverProxyServlet extends HttpServlet {
 	 *            The {@link HttpServletResponse} object by which we can send a
 	 *            proxied response to the client
 	 */
-	public void doGet(HttpServletRequest httpServletRequest,
-			HttpServletResponse httpServletResponse) throws IOException,
-			ServletException {
+	public void doGet(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) throws IOException, ServletException {
 		// Create a GET request
-		GetMethod getMethodProxyRequest = new GetMethod(
-				this.getProxyURL(httpServletRequest));
+		GetMethod getMethodProxyRequest = new GetMethod(this.getProxyURL(httpServletRequest));
 		// Forward the request headers
 		setProxyRequestHeaders(httpServletRequest, getMethodProxyRequest);
 		// Execute the proxy request
-		this.executeProxyRequest(getMethodProxyRequest, httpServletRequest,
-				httpServletResponse);
+		this.executeProxyRequest(getMethodProxyRequest, httpServletRequest, httpServletResponse);
 	}
 
 	/**
@@ -143,12 +145,9 @@ public class ObserverProxyServlet extends HttpServlet {
 	 *            The {@link HttpServletResponse} object by which we can send a
 	 *            proxied response to the client
 	 */
-	public void doPost(HttpServletRequest httpServletRequest,
-			HttpServletResponse httpServletResponse) throws IOException,
-			ServletException {
+	public void doPost(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) throws IOException, ServletException {
 		// Create a standard POST request
-		PostMethod postMethodProxyRequest = new PostMethod(
-				this.getProxyURL(httpServletRequest));
+		PostMethod postMethodProxyRequest = new PostMethod(this.getProxyURL(httpServletRequest));
 		// Forward the request headers
 		setProxyRequestHeaders(httpServletRequest, postMethodProxyRequest);
 		// Check if this is a mulitpart (file upload) POST
@@ -158,8 +157,7 @@ public class ObserverProxyServlet extends HttpServlet {
 			this.handleStandardPost(postMethodProxyRequest, httpServletRequest);
 		}
 		// Execute the proxy request
-		this.executeProxyRequest(postMethodProxyRequest, httpServletRequest,
-				httpServletResponse);
+		this.executeProxyRequest(postMethodProxyRequest, httpServletRequest, httpServletResponse);
 	}
 
 	/**
@@ -174,21 +172,18 @@ public class ObserverProxyServlet extends HttpServlet {
 	 *            POST data to be sent via the {@link PostMethod}
 	 */
 	@SuppressWarnings("unchecked")
-	private void handleMultipartPost(PostMethod postMethodProxyRequest,
-			HttpServletRequest httpServletRequest) throws ServletException {
+	private void handleMultipartPost(PostMethod postMethodProxyRequest, HttpServletRequest httpServletRequest) throws ServletException {
 		// Create a factory for disk-based file items
 		DiskFileItemFactory diskFileItemFactory = new DiskFileItemFactory();
 		// Set factory constraints
 		diskFileItemFactory.setSizeThreshold(this.getMaxFileUploadSize());
 		diskFileItemFactory.setRepository(FILE_UPLOAD_TEMP_DIRECTORY);
 		// Create a new file upload handler
-		ServletFileUpload servletFileUpload = new ServletFileUpload(
-				diskFileItemFactory);
+		ServletFileUpload servletFileUpload = new ServletFileUpload(diskFileItemFactory);
 		// Parse the request
 		try {
 			// Get the multipart items as a list
-			List<FileItem> listFileItems = (List<FileItem>) servletFileUpload
-					.parseRequest(httpServletRequest);
+			List<FileItem> listFileItems = (List<FileItem>) servletFileUpload.parseRequest(httpServletRequest);
 			// Create a list to hold all of the parts
 			List<Part> listParts = new ArrayList<Part>();
 			// Iterate the multipart items list
@@ -196,16 +191,18 @@ public class ObserverProxyServlet extends HttpServlet {
 				// If the current item is a form field, then create a string
 				// part
 				if (fileItemCurrent.isFormField()) {
-					StringPart stringPart = new StringPart(
-							fileItemCurrent.getFieldName(), // The field name
+					StringPart stringPart = new StringPart(fileItemCurrent.getFieldName(), // The
+																							// field
+																							// name
 							fileItemCurrent.getString() // The field value
 					);
 					// Add the part to the list
 					listParts.add(stringPart);
 				} else {
 					// The item is a file upload, so we create a FilePart
-					FilePart filePart = new FilePart(
-							fileItemCurrent.getFieldName(), // The field name
+					FilePart filePart = new FilePart(fileItemCurrent.getFieldName(), // The
+																						// field
+																						// name
 							new ByteArrayPartSource(fileItemCurrent.getName(), // The
 																				// uploaded
 																				// file
@@ -217,8 +214,7 @@ public class ObserverProxyServlet extends HttpServlet {
 					listParts.add(filePart);
 				}
 			}
-			MultipartRequestEntity multipartRequestEntity = new MultipartRequestEntity(
-					listParts.toArray(new Part[] {}),
+			MultipartRequestEntity multipartRequestEntity = new MultipartRequestEntity(listParts.toArray(new Part[] {}),
 					postMethodProxyRequest.getParams());
 			postMethodProxyRequest.setRequestEntity(multipartRequestEntity);
 			// The current content-type header (received from the client) IS of
@@ -229,9 +225,7 @@ public class ObserverProxyServlet extends HttpServlet {
 			// request. However, we are creating a new request with a new chunk
 			// boundary string, so it is necessary that we re-set the
 			// content-type string to reflect the new chunk boundary string
-			postMethodProxyRequest.setRequestHeader(
-					STRING_CONTENT_TYPE_HEADER_NAME,
-					multipartRequestEntity.getContentType());
+			postMethodProxyRequest.setRequestHeader(STRING_CONTENT_TYPE_HEADER_NAME, multipartRequestEntity.getContentType());
 		} catch (FileUploadException fileUploadException) {
 			throw new ServletException(fileUploadException);
 		}
@@ -249,29 +243,24 @@ public class ObserverProxyServlet extends HttpServlet {
 	 *            be sent via the {@link PostMethod}
 	 */
 	@SuppressWarnings("unchecked")
-	private void handleStandardPost(PostMethod postMethodProxyRequest,
-			HttpServletRequest httpServletRequest) {
+	private void handleStandardPost(PostMethod postMethodProxyRequest, HttpServletRequest httpServletRequest) {
 		// Get the client POST data as a Map
-		Map<String, String[]> mapPostParameters = (Map<String, String[]>) httpServletRequest
-				.getParameterMap();
+		Map<String, String[]> mapPostParameters = (Map<String, String[]>) httpServletRequest.getParameterMap();
 		// Create a List to hold the NameValuePairs to be passed to the
 		// PostMethod
 		List<NameValuePair> listNameValuePairs = new ArrayList<NameValuePair>();
 		// Iterate the parameter names
 		for (String stringParameterName : mapPostParameters.keySet()) {
 			// Iterate the values for each parameter name
-			String[] stringArrayParameterValues = mapPostParameters
-					.get(stringParameterName);
+			String[] stringArrayParameterValues = mapPostParameters.get(stringParameterName);
 			for (String stringParamterValue : stringArrayParameterValues) {
 				// Create a NameValuePair and store in list
-				NameValuePair nameValuePair = new NameValuePair(
-						stringParameterName, stringParamterValue);
+				NameValuePair nameValuePair = new NameValuePair(stringParameterName, stringParamterValue);
 				listNameValuePairs.add(nameValuePair);
 			}
 		}
 		// Set the proxy request POST data
-		postMethodProxyRequest.setRequestBody(listNameValuePairs
-				.toArray(new NameValuePair[] {}));
+		postMethodProxyRequest.setRequestBody(listNameValuePairs.toArray(new NameValuePair[] {}));
 	}
 
 	/**
@@ -288,16 +277,13 @@ public class ObserverProxyServlet extends HttpServlet {
 	 * @throws ServletException
 	 *             Can be thrown to indicate that another error has occurred
 	 */
-	private void executeProxyRequest(HttpMethod httpMethodProxyRequest,
-			HttpServletRequest httpServletRequest,
-			HttpServletResponse httpServletResponse) throws IOException,
-			ServletException {
+	private void executeProxyRequest(HttpMethod httpMethodProxyRequest, HttpServletRequest httpServletRequest,
+			HttpServletResponse httpServletResponse) throws IOException, ServletException {
 		// Create a default HttpClient
 		HttpClient httpClient = new HttpClient();
 		httpMethodProxyRequest.setFollowRedirects(false);
 		// Execute the request
-		Integer intProxyResponseCode = httpClient
-				.executeMethod(httpMethodProxyRequest);
+		Integer intProxyResponseCode = httpClient.executeMethod(httpMethodProxyRequest);
 
 		// Check if the proxy response is a redirect
 		// The following code is adapted from
@@ -306,12 +292,9 @@ public class ObserverProxyServlet extends HttpServlet {
 		if (intProxyResponseCode >= HttpServletResponse.SC_MULTIPLE_CHOICES /* 300 */
 				&& intProxyResponseCode < HttpServletResponse.SC_NOT_MODIFIED /* 304 */) {
 			String stringStatusCode = Integer.toString(intProxyResponseCode);
-			String stringLocation = httpMethodProxyRequest.getResponseHeader(
-					STRING_LOCATION_HEADER).getValue();
+			String stringLocation = httpMethodProxyRequest.getResponseHeader(STRING_LOCATION_HEADER).getValue();
 			if (stringLocation == null) {
-				throw new ServletException("Recieved status code: "
-						+ stringStatusCode + " but no "
-						+ STRING_LOCATION_HEADER
+				throw new ServletException("Recieved status code: " + stringStatusCode + " but no " + STRING_LOCATION_HEADER
 						+ " header was found in the response");
 			}
 			// Modify the redirect to go to this proxy servlet rather that the
@@ -331,8 +314,7 @@ public class ObserverProxyServlet extends HttpServlet {
 			// header and the data on disk has not changed; server
 			// responds w/ a 304 saying I'm not going to send the
 			// body because the file has not changed.
-			httpServletResponse.setIntHeader(STRING_CONTENT_LENGTH_HEADER_NAME,
-					0);
+			httpServletResponse.setIntHeader(STRING_CONTENT_LENGTH_HEADER_NAME, 0);
 			httpServletResponse.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
 			return;
 		}
@@ -341,41 +323,48 @@ public class ObserverProxyServlet extends HttpServlet {
 		httpServletResponse.setStatus(intProxyResponseCode);
 
 		// Pass response headers back to the client
-		Header[] headerArrayResponse = httpMethodProxyRequest
-				.getResponseHeaders();
+		Header[] headerArrayResponse = httpMethodProxyRequest.getResponseHeaders();
 		for (Header header : headerArrayResponse) {
 			httpServletResponse.setHeader(header.getName(), header.getValue());
 		}
 
 		// Send the content to the client
-		byte[] responseBody = httpMethodProxyRequest
-				.getResponseBody();
-		BufferedInputStream bufferedInputStream = new BufferedInputStream(
-				new ByteArrayInputStream(responseBody));
-		OutputStream outputStreamClientResponse = httpServletResponse
-				.getOutputStream();
-		int intNextByte;
-		while ((intNextByte = bufferedInputStream.read()) != -1) {
-			outputStreamClientResponse.write(intNextByte);
+		// byte[] responseBody = httpMethodProxyRequest
+		// .getResponseBody();
+
+		byte[] rawResponseBody = ByteStreams.toByteArray(httpMethodProxyRequest.getResponseBodyAsStream());
+		final Header contentEncoding = httpMethodProxyRequest.getResponseHeader("Content-Encoding");
+		InputStream uris;
+		if (contentEncoding != null && contentEncoding.getValue() != null && contentEncoding.getValue().contains("gzip")) {
+			uris = new GZIPInputStream(new ByteArrayInputStream(rawResponseBody));
+			logger.info("Content is gzip encoded");
+		} else {
+			uris = new ByteArrayInputStream(rawResponseBody);
+			logger.info("Content is NOT gzip encoded (" + contentEncoding + ")");
 		}
-		
+		byte[] responseBody = ByteStreams.toByteArray(uris);
+
+		ByteStreams.copy(new ByteArrayInputStream(rawResponseBody), httpServletResponse.getOutputStream());
+
 		for (ResponseObserver ro : responseObservers) {
-			
-			Map<String,String> requestHeaders = Maps.newHashMap();
+
+			Map<String, String> requestHeaders = Maps.newHashMap();
 			final Enumeration requestHeaderNames = httpServletRequest.getHeaderNames();
 			while (requestHeaderNames.hasMoreElements()) {
 				String headerName = (String) requestHeaderNames.nextElement();
 				String headerValue = httpServletRequest.getHeader(headerName);
 				requestHeaders.put(headerName, headerValue);
 			}
-			
-			Map<String,String> responseHeaders = Maps.newHashMap();
+
+			Map<String, String> responseHeaders = Maps.newHashMap();
 			for (Header header : headerArrayResponse) {
 				responseHeaders.put(header.getName(), header.getValue());
+				logger.info("Response header: " + header.getName() + " = " + header.getValue());
 			}
-			
+
 			try {
-				ro.notify(new URI(httpMethodProxyRequest.getURI().toString()), intProxyResponseCode, requestHeaders, responseHeaders, new String(responseBody));
+				ro.notify(new URI(httpMethodProxyRequest.getURI().toString()), intProxyResponseCode, requestHeaders, responseHeaders,
+						new String(responseBody));
 			} catch (URISyntaxException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -398,16 +387,12 @@ public class ObserverProxyServlet extends HttpServlet {
 	 *            The request that we are about to send to the proxy host
 	 */
 	@SuppressWarnings("unchecked")
-	private void setProxyRequestHeaders(HttpServletRequest httpServletRequest,
-			HttpMethod httpMethodProxyRequest) {
+	private void setProxyRequestHeaders(HttpServletRequest httpServletRequest, HttpMethod httpMethodProxyRequest) {
 		// Get an Enumeration of all of the header names sent by the client
-		Enumeration enumerationOfHeaderNames = httpServletRequest
-				.getHeaderNames();
+		Enumeration enumerationOfHeaderNames = httpServletRequest.getHeaderNames();
 		while (enumerationOfHeaderNames.hasMoreElements()) {
-			String stringHeaderName = (String) enumerationOfHeaderNames
-					.nextElement();
-			if (stringHeaderName
-					.equalsIgnoreCase(STRING_CONTENT_LENGTH_HEADER_NAME))
+			String stringHeaderName = (String) enumerationOfHeaderNames.nextElement();
+			if (stringHeaderName.equalsIgnoreCase(STRING_CONTENT_LENGTH_HEADER_NAME))
 				continue;
 			// As per the Java Servlet API 2.5 documentation:
 			// Some headers, such as Accept-Language can be sent by clients
@@ -415,18 +400,16 @@ public class ObserverProxyServlet extends HttpServlet {
 			// sending the header as a comma separated list.
 			// Thus, we get an Enumeration of the header values sent by the
 			// client
-			Enumeration enumerationOfHeaderValues = httpServletRequest
-					.getHeaders(stringHeaderName);
+			Enumeration enumerationOfHeaderValues = httpServletRequest.getHeaders(stringHeaderName);
 			while (enumerationOfHeaderValues.hasMoreElements()) {
-				String stringHeaderValue = (String) enumerationOfHeaderValues
-						.nextElement();
+				String stringHeaderValue = (String) enumerationOfHeaderValues.nextElement();
 
 				if (stringHeaderName != "Accept-Encoding") {
 					Header header = new Header(stringHeaderName, stringHeaderValue);
 					// Set the same header on the proxy request
 					httpMethodProxyRequest.setRequestHeader(header);
 				}
-				
+
 			}
 		}
 	}
