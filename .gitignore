@@ -3,3 +3,8 @@
 .settings
 target
 bin
+unicorn-server/apache-tomcat-6.0.29/target
+unicorn-server/apache-tomcat-6.0.29/webapps/unicorn
+unicorn-server/apache-tomcat-6.0.29/proxyWebapps/analyticproxy-core-1.0.0-SNAPSHOT
+unicorn-server/apache-tomcat-6.0.29/logs
+unicorn-server/apache-tomcat-6.0.29/work

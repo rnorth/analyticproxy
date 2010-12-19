@@ -38,8 +38,7 @@ import com.google.common.io.ByteStreams;
  */
 public class ValidatorTask implements Runnable {
 
-	private static final Logger logger = LoggerFactory
-			.getLogger(ValidatorTask.class);
+	private static final Logger logger = LoggerFactory.getLogger(ValidatorTask.class);
 
 	private final URI uri;
 	private final Integer responseCode;
@@ -47,9 +46,12 @@ public class ValidatorTask implements Runnable {
 	private final Map<String, String> responseHeaders;
 	private final String responseBody;
 
-	private static final List<String> supportedContentTypes = Lists.newArrayList("text/html","application/xhtml+xml","text/css","application/xml","text/xml");
+	private static final HttpClient client = new DefaultHttpClient();
 
-	private static final Map<String,String> contentTypeValidationType = Maps.newHashMap();
+	private static final List<String> supportedContentTypes = Lists.newArrayList("text/html", "application/xhtml+xml", "text/css",
+			"application/xml", "text/xml");
+
+	private static final Map<String, String> contentTypeValidationType = Maps.newHashMap();
 	static {
 		contentTypeValidationType.put("text/html", "markup-validator");
 		contentTypeValidationType.put("application/xhtml+xml", "markup-validator");
@@ -57,10 +59,9 @@ public class ValidatorTask implements Runnable {
 		contentTypeValidationType.put("application/xml", "markup-validator");
 		contentTypeValidationType.put("text/xml", "markup-validator");
 	}
-	
-	public ValidatorTask(URI uri, Integer responseCode,
-			Map<String, String> requestHeaders,
-			Map<String, String> responseHeaders, String responseBody) {
+
+	public ValidatorTask(URI uri, Integer responseCode, Map<String, String> requestHeaders, Map<String, String> responseHeaders,
+			String responseBody) {
 
 		this.uri = uri;
 		this.responseCode = responseCode;
@@ -77,28 +78,23 @@ public class ValidatorTask implements Runnable {
 	public void run() {
 
 		if (!isSupportedContentType(responseHeaders)) {
-			logger.info("Not processing unsupported content type");
+			logger.debug("Not processing unsupported content type");
 			return;
 		}
-		
+
 		// Check whether existing content for this page has been stored
 		URI rawContentStorePath = new File("./target/content/raw").toURI();
-		URI validatedContentStorePath = new File("./target/content/validated")
-				.toURI();
-		
+		URI validatedContentStorePath = new File("./target/content/validated").toURI();
+
 		new File(rawContentStorePath).mkdirs();
 		new File(validatedContentStorePath).mkdirs();
-		
-		URI thisUriRawContentStorePath = rawContentStorePath.resolve(uri
-				.getHost() + "/" + uri.getPath());
-		URI thisUriValidatedContentStorePath = validatedContentStorePath
-				.resolve(uri.getHost() + "/" + uri.getPath() + ".html");
-		logger.info("uri.getHost() + \"/\" + uri.getPath() = " + uri.getHost() + "/" + uri.getPath());
+
+		URI thisUriRawContentStorePath = rawContentStorePath.resolve(uri.getHost() + "/" + uri.getPath());
+		URI thisUriValidatedContentStorePath = validatedContentStorePath.resolve(uri.getHost() + "/" + uri.getPath() + ".html");
+		logger.debug("uri.getHost() + \"/\" + uri.getPath() = " + uri.getHost() + "/" + uri.getPath());
 
 		if (new File(thisUriRawContentStorePath).exists()) {
-			logger.info(
-					"Content already captured for {} - not going to store or validate",
-					uri);
+			logger.info("Content already captured for {} - not going to store or validate", uri);
 			return;
 		}
 
@@ -123,7 +119,7 @@ public class ValidatorTask implements Runnable {
 			return;
 		}
 		logger.info("Validation results obtained");
-		
+
 		// Save validation results
 		try {
 			validationResultsPage = validationResultsPage.replaceAll("href=\\\"\\.\\/", "href=\"http://validator.w3.org/unicorn/");
@@ -134,19 +130,19 @@ public class ValidatorTask implements Runnable {
 			return;
 		}
 		logger.info("Validation results saved");
-		
+
 	}
 
 	private boolean isSupportedContentType(Map<String, String> responseHeaders2) {
 		return getSupportedContentType(responseHeaders2) != null;
 	}
-	
-	private String getSupportedContentType(Map<String,String> responseHeaders2) {
-		for (Entry<String,String> e : responseHeaders2.entrySet()) {
+
+	private String getSupportedContentType(Map<String, String> responseHeaders2) {
+		for (Entry<String, String> e : responseHeaders2.entrySet()) {
 			if (e.getKey().equals("Content-Type")) {
-				
-				logger.info("Got content type={}", e.getValue());
-				
+
+				logger.debug("Got content type={}", e.getValue());
+
 				for (String supportedType : supportedContentTypes) {
 					if (e.getValue().startsWith(supportedType)) {
 						return supportedType;
@@ -154,48 +150,51 @@ public class ValidatorTask implements Runnable {
 				}
 			}
 		}
-		
+
 		return null;
 	}
 
-	private String submitToValidator() throws IOException,
-			ClientProtocolException {
-		HttpClient client = new DefaultHttpClient();
-		HttpPost post = new HttpPost("http://localhost:8580/unicorn/check");
+	private String submitToValidator() throws IOException, ClientProtocolException {
+
+		final String contentType = contentTypeValidationType.get(getSupportedContentType(responseHeaders));
+
+		HttpPost post = new HttpPost(ConfigurationProvider.getSetting("unicornServerURI"));
 		List<NameValuePair> formparams = new ArrayList<NameValuePair>();
 		formparams.add(new BasicNameValuePair("ucn_text", responseBody));
 		formparams.add(new BasicNameValuePair("ucn_text_mime", getSupportedContentType(responseHeaders)));
 		formparams.add(new BasicNameValuePair("doctype", "inline"));
 		formparams.add(new BasicNameValuePair("charset", "(detect automatically)"));
 		formparams.add(new BasicNameValuePair("ucn_task", "custom"));
-		formparams.add(new BasicNameValuePair("tests", contentTypeValidationType.get(getSupportedContentType(responseHeaders))));
+		formparams.add(new BasicNameValuePair("tests", contentType));
 		UrlEncodedFormEntity entity = new UrlEncodedFormEntity(formparams, "UTF-8");
 		post.setEntity(entity);
-		
+
 		HttpResponse httpResponse = client.execute(post);
-		
+
 		logger.info("HTTP response code was {}", httpResponse.getStatusLine());
 		if (httpResponse.getStatusLine().getStatusCode() != 200) {
 			throw new IOException("Unexpected status code received!");
 		}
-		
+
 		InputStream content = httpResponse.getEntity().getContent();
-		
+
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ByteStreams.copy(content, baos);
 		return baos.toString();
 	}
 
-	private void saveContent(URI thisUriContentStorePath, String contentToSave)
-			throws IOException {
+	private void saveContent(URI thisUriContentStorePath, String contentToSave) throws IOException {
 		File rawContentFile = new File(thisUriContentStorePath);
 		rawContentFile.getParentFile().mkdirs();
 
 		logger.info("Saving content at {}", thisUriContentStorePath);
-		
+
 		final FileWriter fileWriter = new FileWriter(rawContentFile);
-		fileWriter.write(contentToSave);
-		fileWriter.close();
+		try {
+			fileWriter.write(contentToSave);
+		} finally {
+			fileWriter.close();
+		}
 	}
 
 }

@@ -54,7 +54,7 @@
       <Realm className="org.apache.catalina.realm.UserDatabaseRealm"
              resourceName="UserDatabase"/>
       <Host name="AppsHost"  appBase="webapps"
-            unpackWARs="false" autoDeploy="true"
+            unpackWARs="true" autoDeploy="true"
             xmlValidation="false" xmlNamespaceAware="false">
 
 			<Valve className="org.apache.catalina.valves.AccessLogValve" directory="logs"  
@@ -77,7 +77,10 @@
 			<Valve className="org.apache.catalina.valves.AccessLogValve" directory="logs"  
 	               prefix="proxy_access_log." suffix=".txt" pattern="common" resolveHosts="false"/>
 	
-			<Context docBase="analyticproxy-core-0.0.1-SNAPSHOT" path=""/>
+			<Context docBase="analyticproxy-core-0.0.1-SNAPSHOT" path="">
+				<Environment name="unicornServerURI" value="http://localhost:8580/unicorn/check"
+				         type="java.lang.String" override="false"/>
+			</Context>	
       </Host>
     </Engine>
   </Service>
