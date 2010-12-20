@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.analyticproxy.validation.ContentStore.ContentNature;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.ClientProtocolException;
@@ -46,12 +47,12 @@ public class ValidatorTask implements Runnable {
 	private final Map<String, String> responseHeaders;
 	private final String responseBody;
 
-	private static final HttpClient client = new DefaultHttpClient();
-
 	private static final List<String> supportedContentTypes = Lists.newArrayList("text/html", "application/xhtml+xml", "text/css",
 			"application/xml", "text/xml");
 
 	private static final Map<String, String> contentTypeValidationType = Maps.newHashMap();
+
+	private final ContentStore contentStore;
 	static {
 		contentTypeValidationType.put("text/html", "markup-validator");
 		contentTypeValidationType.put("application/xhtml+xml", "markup-validator");
@@ -61,13 +62,14 @@ public class ValidatorTask implements Runnable {
 	}
 
 	public ValidatorTask(URI uri, Integer responseCode, Map<String, String> requestHeaders, Map<String, String> responseHeaders,
-			String responseBody) {
+			String responseBody, ContentStore contentStore) {
 
 		this.uri = uri;
 		this.responseCode = responseCode;
 		this.requestHeaders = requestHeaders;
 		this.responseHeaders = responseHeaders;
 		this.responseBody = responseBody;
+		this.contentStore = contentStore;
 	}
 
 	/*
@@ -82,25 +84,16 @@ public class ValidatorTask implements Runnable {
 			return;
 		}
 
-		// Check whether existing content for this page has been stored
-		URI rawContentStorePath = new File(ConfigurationProvider.getSetting("rawContentStore")).toURI();
-		URI validatedContentStorePath = new File(ConfigurationProvider.getSetting("validatedResultsContentStore")).toURI();
-
-		new File(rawContentStorePath).mkdirs();
-		new File(validatedContentStorePath).mkdirs();
-
-		URI thisUriRawContentStorePath = rawContentStorePath.resolve(uri.getHost() + "/" + uri.getPath());
-		URI thisUriValidatedContentStorePath = validatedContentStorePath.resolve(uri.getHost() + "/" + uri.getPath() + ".html");
 		logger.debug("uri.getHost() + \"/\" + uri.getPath() = " + uri.getHost() + "/" + uri.getPath());
 
-		if (new File(thisUriRawContentStorePath).exists()) {
+		if (contentStore.hasExistingContentForUri(uri)) {
 			logger.info("Content already captured for {} - not going to store or validate", uri);
 			return;
 		}
 
 		// Store the witnessed content
 		try {
-			saveContent(thisUriRawContentStorePath, responseBody);
+			saveContent(ContentNature.RAW, responseBody);
 		} catch (IOException e) {
 			logger.error("Problem saving raw content - aborting", e);
 			return;
@@ -124,7 +117,7 @@ public class ValidatorTask implements Runnable {
 		try {
 			validationResultsPage = validationResultsPage.replaceAll("href=\\\"\\.\\/", "href=\"http://validator.w3.org/unicorn/");
 			validationResultsPage = validationResultsPage.replaceAll("src=\\\"\\.\\/", "src=\"http://validator.w3.org/unicorn/");
-			saveContent(thisUriValidatedContentStorePath, validationResultsPage);
+			saveContent(ContentNature.VALIDATED, validationResultsPage);
 		} catch (IOException e) {
 			logger.error("Problem saving validated content - aborting", e);
 			return;
@@ -169,6 +162,7 @@ public class ValidatorTask implements Runnable {
 		UrlEncodedFormEntity entity = new UrlEncodedFormEntity(formparams, "UTF-8");
 		post.setEntity(entity);
 
+		HttpClient client = new DefaultHttpClient();
 		HttpResponse httpResponse = client.execute(post);
 
 		logger.debug("HTTP response code was {}", httpResponse.getStatusLine());
@@ -183,18 +177,9 @@ public class ValidatorTask implements Runnable {
 		return baos.toString();
 	}
 
-	private void saveContent(URI thisUriContentStorePath, String contentToSave) throws IOException {
-		File rawContentFile = new File(thisUriContentStorePath);
-		rawContentFile.getParentFile().mkdirs();
-
-		logger.debug("Saving content at {}", thisUriContentStorePath);
-
-		final FileWriter fileWriter = new FileWriter(rawContentFile);
-		try {
-			fileWriter.write(contentToSave);
-		} finally {
-			fileWriter.close();
-		}
+	private void saveContent(ContentNature nature, String contentToSave) throws IOException {
+	
+		contentStore.save(nature, uri, contentToSave);
 	}
 
 }

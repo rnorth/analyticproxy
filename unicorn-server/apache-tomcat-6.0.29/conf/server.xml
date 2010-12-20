@@ -80,9 +80,7 @@
 			<Context docBase="analyticproxy-core-0.0.1-SNAPSHOT" path="">
 				<Environment name="unicornServerURI" value="http://localhost:8580/unicorn/check"
 				         type="java.lang.String" override="false"/>
-				<Environment name="rawContentStore" value="./savedContent/raw"
-						 type="java.lang.String" override="false"/>
-				<Environment name="validatedResultsContentStore" value="./savedContent/raw"
+				<Environment name="contentStoreBase" value="savedContent"
 						 type="java.lang.String" override="false"/>
 			</Context>	
       </Host>

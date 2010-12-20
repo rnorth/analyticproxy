@@ -337,10 +337,10 @@ public class ObserverProxyServlet extends HttpServlet {
 		InputStream uris;
 		if (contentEncoding != null && contentEncoding.getValue() != null && contentEncoding.getValue().contains("gzip")) {
 			uris = new GZIPInputStream(new ByteArrayInputStream(rawResponseBody));
-			logger.info("Content is gzip encoded");
+			logger.debug("Content is gzip encoded");
 		} else {
 			uris = new ByteArrayInputStream(rawResponseBody);
-			logger.info("Content is NOT gzip encoded (" + contentEncoding + ")");
+			logger.debug("Content is NOT gzip encoded ({})", contentEncoding);
 		}
 		byte[] responseBody = ByteStreams.toByteArray(uris);
 
@@ -359,7 +359,7 @@ public class ObserverProxyServlet extends HttpServlet {
 			Map<String, String> responseHeaders = Maps.newHashMap();
 			for (Header header : headerArrayResponse) {
 				responseHeaders.put(header.getName(), header.getValue());
-				logger.info("Response header: " + header.getName() + " = " + header.getValue());
+				logger.debug("Response header: " + header.getName() + " = " + header.getValue());
 			}
 
 			try {
