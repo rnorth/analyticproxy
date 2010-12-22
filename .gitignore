@@ -4,7 +4,5 @@
 target
 bin
 proxy-server/apache-tomcat-6.0.29/savedContent
-proxy-server/apache-tomcat-6.0.29/logs/*
-proxy-server/apache-tomcat-6.0.29/work/*
 proxy-server/apache-tomcat-6.0.29/proxyWebapps/*.war
 **/.DS_Store
