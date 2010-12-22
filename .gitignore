@@ -3,8 +3,9 @@
 .settings
 target
 bin
-unicorn-server/apache-tomcat-6.0.29/savedContent
-unicorn-server/apache-tomcat-6.0.29/webapps/unicorn
-unicorn-server/apache-tomcat-6.0.29/logs
-unicorn-server/apache-tomcat-6.0.29/work
-unicorn-server/apache-tomcat-6.0.29/proxyWebapps/analyticproxy-core-0.0.1-SNAPSHOT
+proxy-server/apache-tomcat-6.0.29/savedContent
+proxy-server/apache-tomcat-6.0.29/webapps/*
+proxy-server/apache-tomcat-6.0.29/logs/*
+proxy-server/apache-tomcat-6.0.29/work/*
+proxy-server/apache-tomcat-6.0.29/proxyWebapps/*
+**/.DS_Store
