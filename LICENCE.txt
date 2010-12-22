@@ -1,4 +1,4 @@
-Copyright 2010 Richard North
+Copyright 2010 Richard North and other authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -20,3 +20,6 @@ server, the licence for which is included under
 proxy-server/apache-tomcat-6.029, and is also licenced under the Apache
 Licence, Version 2.0 with the exception of the LZMA compression module.
 
+This distribution includes a binary copy of the W3C Unicorn validation
+software, licenced under the W3C Software Licence described in 
+LICENCE-UNICORN.html
