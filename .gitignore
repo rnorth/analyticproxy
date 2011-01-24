@@ -4,4 +4,7 @@
 target
 proxy-server/apache-tomcat-6.0.29/savedContent
 proxy-server/apache-tomcat-6.0.29/proxyWebapps/*.war
+proxy-server/apache-tomcat-6.0.29/proxyWebapps/
+proxy-server/apache-tomcat-6.0.29/webapps/unicorn/
+proxy-server/apache-tomcat-6.0.29/work/
 **/.DS_Store
