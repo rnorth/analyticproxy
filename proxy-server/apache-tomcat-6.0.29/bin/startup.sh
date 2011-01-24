@@ -45,7 +45,6 @@ done
  
 PRGDIR=`dirname "$PRG"`
 EXECUTABLE=catalina.sh
-export CATALINA_OPTS=$CATALINA_OPTS -Dcom.sun.management.jmxremote
 
 # Check that target executable exists
 if $os400; then
