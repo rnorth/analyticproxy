@@ -5,12 +5,15 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
 
-import org.analyticproxy.validation.ContentStore.ContentNature;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ContentStore {
 
 	
+	private static final String BASEPATH = "BASEPATH";
 	private final String sessionId;
+	private static final Logger logger = LoggerFactory.getLogger(ContentStore.class);
 
 	public ContentStore(String sessionId) {
 		this.sessionId = sessionId;
@@ -21,11 +24,22 @@ public class ContentStore {
 	}
 	
 	private File calculateFileForURI(URI uri, ContentNature nature) {
-		return new File(ConfigurationProvider.getSetting("contentStoreBase") + 
+
+		String path = uri.getPath();
+		if (path==null || path.equals("/")) {
+			logger.debug("Resource has no path component - using {}", BASEPATH);
+			path = BASEPATH;
+		}
+		
+		File f = new File(ConfigurationProvider.getSetting("contentStoreBase") + 
 					File.separator + sessionId + 
 						File.separator + nature.folderName +
 							File.separator + uri.getHost() +
-								File.separator + uri.getPath() + nature.suffix);
+								File.separator + path + nature.suffix);
+		
+		logger.debug("Calculating file path for uri [{}] -> [{}]", uri, f);
+		
+		return f;
 	}
 
 	public void save(ContentNature nature, URI uri, String contentToSave) {
